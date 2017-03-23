@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-2017 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,8 +52,7 @@ import org.springframework.http.converter.xml.MappingJackson2XmlHttpMessageConve
 import org.springframework.http.converter.xml.SourceHttpMessageConverter;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
-import org.springframework.web.util.AbstractUriTemplateHandler;
-import org.springframework.web.util.DefaultUriTemplateHandler;
+import org.springframework.web.util.DefaultUriBuilderFactory;
 import org.springframework.web.util.UriTemplateHandler;
 
 /**
@@ -149,7 +148,7 @@ public class RestTemplate extends InterceptingHttpAccessor implements RestOperat
 
 	private ResponseErrorHandler errorHandler = new DefaultResponseErrorHandler();
 
-	private UriTemplateHandler uriTemplateHandler = new DefaultUriTemplateHandler();
+	private UriTemplateHandler uriTemplateHandler = new DefaultUriBuilderFactory();
 
 	private final ResponseExtractor<HttpHeaders> headersExtractor = new HeadersExtractor();
 
@@ -161,7 +160,7 @@ public class RestTemplate extends InterceptingHttpAccessor implements RestOperat
 	public RestTemplate() {
 		this.messageConverters.add(new ByteArrayHttpMessageConverter());
 		this.messageConverters.add(new StringHttpMessageConverter());
-		this.messageConverters.add(new ResourceHttpMessageConverter());
+		this.messageConverters.add(new ResourceHttpMessageConverter(false));
 		this.messageConverters.add(new SourceHttpMessageConverter<>());
 		this.messageConverters.add(new AllEncompassingFormHttpMessageConverter());
 
@@ -254,24 +253,33 @@ public class RestTemplate extends InterceptingHttpAccessor implements RestOperat
 	/**
 	 * Configure default URI variable values. This is a shortcut for:
 	 * <pre class="code">
-	 * DefaultUriTemplateHandler handler = new DefaultUriTemplateHandler();
+	 * DefaultUriBuilderFactory factory = new DefaultUriBuilderFactory();
 	 * handler.setDefaultUriVariables(...);
 	 *
 	 * RestTemplate restTemplate = new RestTemplate();
 	 * restTemplate.setUriTemplateHandler(handler);
 	 * </pre>
-	 * @param defaultUriVariables the default URI variable values
+	 * @param uriVars the default URI variable values
 	 * @since 4.3
 	 */
-	public void setDefaultUriVariables(Map<String, ?> defaultUriVariables) {
-		Assert.isInstanceOf(AbstractUriTemplateHandler.class, this.uriTemplateHandler,
-				"Can only use this property in conjunction with an AbstractUriTemplateHandler");
-		((AbstractUriTemplateHandler) this.uriTemplateHandler).setDefaultUriVariables(defaultUriVariables);
+	@SuppressWarnings("deprecation")
+	public void setDefaultUriVariables(Map<String, ?> uriVars) {
+		if (this.uriTemplateHandler instanceof DefaultUriBuilderFactory) {
+			((DefaultUriBuilderFactory) this.uriTemplateHandler).setDefaultUriVariables(uriVars);
+		}
+		else if (this.uriTemplateHandler instanceof org.springframework.web.util.AbstractUriTemplateHandler) {
+			((org.springframework.web.util.AbstractUriTemplateHandler) this.uriTemplateHandler)
+					.setDefaultUriVariables(uriVars);
+		}
+		else {
+			throw new IllegalArgumentException(
+					"This property is not supported with the configured UriTemplateHandler.");
+		}
 	}
 
 	/**
 	 * Configure the {@link UriTemplateHandler} to use to expand URI templates.
-	 * By default the {@link DefaultUriTemplateHandler} is used which relies on
+	 * By default the {@link DefaultUriBuilderFactory} is used which relies on
 	 * Spring's URI template support and exposes several useful properties that
 	 * customize its behavior for encoding and for prepending a common base URL.
 	 * An alternative implementation may be used to plug an external URI
@@ -458,6 +466,7 @@ public class RestTemplate extends InterceptingHttpAccessor implements RestOperat
 		execute(url, HttpMethod.PUT, requestCallback, null);
 	}
 
+
 	// PATCH
 
 	@Override
@@ -489,6 +498,7 @@ public class RestTemplate extends InterceptingHttpAccessor implements RestOperat
 				new HttpMessageConverterExtractor<>(responseType, getMessageConverters());
 		return execute(url, HttpMethod.PATCH, requestCallback, responseExtractor);
 	}
+
 
 	// DELETE
 
@@ -692,8 +702,8 @@ public class RestTemplate extends InterceptingHttpAccessor implements RestOperat
 	 * @param method the HTTP method to execute (GET, POST, etc.)
 	 * @param response the resulting {@link ClientHttpResponse}
 	 * @throws IOException if propagated from {@link ResponseErrorHandler}
-	 * @see #setErrorHandler
 	 * @since 4.1.6
+	 * @see #setErrorHandler
 	 */
 	protected void handleResponse(URI url, HttpMethod method, ClientHttpResponse response) throws IOException {
 		ResponseErrorHandler errorHandler = getErrorHandler();

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-2017 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,6 +35,8 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameter;
+import org.junit.runners.Parameterized.Parameters;
 
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ClassPathResource;
@@ -55,13 +57,7 @@ import org.springframework.http.converter.json.MappingJacksonValue;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 /**
  * @author Arjen Poutsma
@@ -72,23 +68,25 @@ public class RestTemplateIntegrationTests extends AbstractMockWebServerTestCase 
 
 	private RestTemplate template;
 
-	@Parameterized.Parameter
+	@Parameter
 	public ClientHttpRequestFactory clientHttpRequestFactory;
 
-	@Parameterized.Parameters
+	@Parameters
 	public static Iterable<? extends ClientHttpRequestFactory> data() {
 		return Arrays.asList(
+				new SimpleClientHttpRequestFactory(),
 				new HttpComponentsClientHttpRequestFactory(),
 				new Netty4ClientHttpRequestFactory(),
-				new OkHttp3ClientHttpRequestFactory(),
-				new SimpleClientHttpRequestFactory()
+				new OkHttp3ClientHttpRequestFactory()
 		);
 	}
 
+
 	@Before
-	public void setUpClient() {
+	public void setupClient() {
 		 this.template = new RestTemplate(this.clientHttpRequestFactory);
 	}
+
 
 	@Test
 	public void getString() {
@@ -305,10 +303,15 @@ public class RestTemplateIntegrationTests extends AbstractMockWebServerTestCase 
 		assertTrue(content.contains("\"type\":\"bar\""));
 	}
 
+	@Test  // SPR-15015
+	public void postWithoutBody() throws Exception {
+		assertNull(template.postForObject(baseUrl + "/jsonpost", null, String.class));
+	}
 
-	public interface MyJacksonView1 {};
 
-	public interface MyJacksonView2 {};
+	public interface MyJacksonView1 {}
+
+	public interface MyJacksonView2 {}
 
 
 	public static class MySampleBean {

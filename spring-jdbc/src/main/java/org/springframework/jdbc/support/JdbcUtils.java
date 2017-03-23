@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-2017 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@ import org.apache.commons.logging.LogFactory;
 
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.jdbc.datasource.DataSourceUtils;
+import org.springframework.util.NumberUtils;
 
 /**
  * Generic utility methods for working with JDBC. Mainly for internal use
@@ -183,6 +184,24 @@ public abstract class JdbcUtils {
 		}
 		else if (Clob.class == requiredType) {
 			return rs.getClob(index);
+		}
+		else if (requiredType.isEnum()) {
+			// Enums can either be represented through a String or an enum index value:
+			// leave enum type conversion up to the caller (e.g. a ConversionService)
+			// but make sure that we return nothing other than a String or an Integer.
+			Object obj = rs.getObject(index);
+			if (obj instanceof String) {
+				return obj;
+			}
+			else if (obj instanceof Number) {
+				// Defensively convert any Number to an Integer (as needed by our
+				// ConversionService's IntegerToEnumConverterFactory) for use as index
+				return NumberUtils.convertNumberToTargetClass((Number) obj, Integer.class);
+			}
+			else {
+				// e.g. on Postgres: getObject returns a PGObject but we need a String
+				return rs.getString(index);
+			}
 		}
 
 		else {
@@ -393,7 +412,7 @@ public abstract class JdbcUtils {
 
 	/**
 	 * Extract a common name for the database in use even if various drivers/platforms provide varying names.
-	 * @param source the name as provided in database metedata
+	 * @param source the name as provided in database metadata
 	 * @return the common name to be used
 	 */
 	public static String commonDatabaseName(String source) {
@@ -452,7 +471,7 @@ public abstract class JdbcUtils {
 		StringBuilder result = new StringBuilder();
 		boolean nextIsUpper = false;
 		if (name != null && name.length() > 0) {
-			if (name.length() > 1 && name.substring(1,2).equals("_")) {
+			if (name.length() > 1 && name.substring(1, 2).equals("_")) {
 				result.append(name.substring(0, 1).toUpperCase());
 			}
 			else {

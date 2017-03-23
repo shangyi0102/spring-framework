@@ -186,7 +186,7 @@ public class TypeDescriptor implements Serializable {
 			return this;
 		}
 		ResolvableType narrowed = ResolvableType.forType(value.getClass(), getResolvableType());
-		return new TypeDescriptor(narrowed, null, getAnnotations());
+		return new TypeDescriptor(narrowed, value.getClass(), getAnnotations());
 	}
 
 	/**
@@ -435,7 +435,10 @@ public class TypeDescriptor implements Serializable {
 		if (typeDescriptor != null) {
 			return typeDescriptor.narrow(value);
 		}
-		return (value != null ? new TypeDescriptor(getResolvableType(), value.getClass(), getAnnotations()) : null);
+		if (value != null) {
+			return narrow(value);
+		}
+		return null;
 	}
 
 	@Override
@@ -476,12 +479,17 @@ public class TypeDescriptor implements Serializable {
 		}
 		if (anns.length > 0) {
 			for (int i = 0; i < anns.length; i++) {
-				if (anns[i] != otherAnns[i]) {
+				if (!annotationEquals(anns[i], otherAnns[i])) {
 					return false;
 				}
 			}
 		}
 		return true;
+	}
+
+	private boolean annotationEquals(Annotation ann, Annotation otherAnn) {
+		// Annotation.equals is reflective and pretty slow, so let's check identity and proxy type first.
+		return (ann == otherAnn || (ann.getClass() == otherAnn.getClass() && ann.equals(otherAnn)));
 	}
 
 	@Override

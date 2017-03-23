@@ -22,7 +22,6 @@ import java.util.function.Function;
 import io.netty.buffer.ByteBuf;
 
 import org.springframework.messaging.Message;
-import org.springframework.util.Assert;
 
 /**
  * Simple holder for a decoding {@link Function} and an encoding
@@ -31,28 +30,20 @@ import org.springframework.util.Assert;
  * @author Rossen Stoyanchev
  * @since 5.0
  */
-public class ReactorNettyCodec<P> {
+public interface ReactorNettyCodec<P> {
 
-	private final Function<? super ByteBuf, ? extends Collection<Message<P>>> decoder;
+	/**
+	 * Decode the input {@link ByteBuf} into one or more {@link Message}s.
+	 * @param inputBuffer the input buffer to decode from
+	 * @return 0 or more decoded messages
+	 */
+	Collection<Message<P>> decode(ByteBuf inputBuffer);
 
-	private final BiConsumer<? super ByteBuf, ? super Message<P>> encoder;
-
-
-	public ReactorNettyCodec(Function<? super ByteBuf, ? extends Collection<Message<P>>> decoder,
-			BiConsumer<? super ByteBuf, ? super Message<P>> encoder) {
-
-		Assert.notNull(decoder, "'decoder' is required");
-		Assert.notNull(encoder, "'encoder' is required");
-		this.decoder = decoder;
-		this.encoder = encoder;
-	}
-
-	public Function<? super ByteBuf, ? extends Collection<Message<P>>> getDecoder() {
-		return this.decoder;
-	}
-
-	public BiConsumer<? super ByteBuf, ? super Message<P>> getEncoder() {
-		return this.encoder;
-	}
+	/**
+	 * Encode the given {@link Message} to the output {@link ByteBuf}.
+	 * @param message the message the encode
+	 * @param outputBuffer the buffer to write to
+	 */
+	void encode(Message<P> message, ByteBuf outputBuffer);
 
 }

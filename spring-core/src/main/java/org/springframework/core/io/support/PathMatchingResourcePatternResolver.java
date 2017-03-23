@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-2017 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -284,9 +284,10 @@ public class PathMatchingResourcePatternResolver implements ResourcePatternResol
 			}
 		}
 		else {
-			// Only look for a pattern after a prefix here
-			// (to not get fooled by a pattern symbol in a strange prefix).
-			int prefixEnd = locationPattern.indexOf(":") + 1;
+			// Generally only look for a pattern after a prefix here,
+			// and on Tomcat only after the "*/" separator for its "war:" protocol.
+			int prefixEnd = (locationPattern.startsWith("war:") ? locationPattern.indexOf("*/") + 1 :
+					locationPattern.indexOf(":") + 1);
 			if (getPathMatcher().isPattern(locationPattern.substring(prefixEnd))) {
 				// a file pattern
 				return findPathMatchingResources(locationPattern);
@@ -809,7 +810,7 @@ public class PathMatchingResourcePatternResolver implements ResourcePatternResol
 		public PatternVirtualFileVisitor(String rootPath, String subPattern, PathMatcher pathMatcher) {
 			this.subPattern = subPattern;
 			this.pathMatcher = pathMatcher;
-			this.rootPath = (rootPath.length() == 0 || rootPath.endsWith("/") ? rootPath : rootPath + "/");
+			this.rootPath = (rootPath.isEmpty() || rootPath.endsWith("/") ? rootPath : rootPath + "/");
 		}
 
 		@Override
