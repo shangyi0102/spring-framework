@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-2017 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -90,7 +90,6 @@ public abstract class AbstractMessageConverterMethodProcessor extends AbstractMe
 	private final Set<String> safeExtensions = new HashSet<String>();
 
 
-
 	/**
 	 * Constructor with list of converters only.
 	 */
@@ -157,8 +156,8 @@ public abstract class AbstractMessageConverterMethodProcessor extends AbstractMe
 	 * @param inputMessage the input messages. Used to inspect the {@code Accept} header.
 	 * @param outputMessage the output message to write to
 	 * @throws IOException thrown in case of I/O errors
-	 * @throws HttpMediaTypeNotAcceptableException thrown when the conditions indicated by {@code Accept} header on
-	 * the request cannot be met by the message converters
+	 * @throws HttpMediaTypeNotAcceptableException thrown when the conditions indicated
+	 * by the {@code Accept} header on the request cannot be met by the message converters
 	 */
 	@SuppressWarnings("unchecked")
 	protected <T> void writeWithMessageConverters(T value, MethodParameter returnType,
@@ -348,9 +347,7 @@ public abstract class AbstractMessageConverterMethodProcessor extends AbstractMe
 	 * header with a safe attachment file name ("f.txt") is added to prevent
 	 * RFD exploits.
 	 */
-	private void addContentDispositionHeader(ServletServerHttpRequest request,
-			ServletServerHttpResponse response) {
-
+	private void addContentDispositionHeader(ServletServerHttpRequest request, ServletServerHttpResponse response) {
 		HttpHeaders headers = response.getHeaders();
 		if (headers.containsKey(HttpHeaders.CONTENT_DISPOSITION)) {
 			return;
@@ -363,7 +360,7 @@ public abstract class AbstractMessageConverterMethodProcessor extends AbstractMe
 			}
 		}
 		catch (Throwable ex) {
-			// Ignore
+			// ignore
 		}
 
 		HttpServletRequest servletRequest = request.getServletRequest();

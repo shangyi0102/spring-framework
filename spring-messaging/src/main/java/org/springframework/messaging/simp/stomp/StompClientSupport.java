@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-2017 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,9 @@
 package org.springframework.messaging.simp.stomp;
 
 import java.util.Arrays;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 import org.springframework.messaging.converter.MessageConverter;
 import org.springframework.messaging.converter.SimpleMessageConverter;
@@ -39,6 +42,8 @@ import org.springframework.util.Assert;
  * @since 4.2
  */
 public abstract class StompClientSupport {
+
+	protected Log logger = LogFactory.getLog(getClass());
 
 	private MessageConverter messageConverter = new SimpleMessageConverter();
 
@@ -126,7 +131,7 @@ public abstract class StompClientSupport {
 	 * <p>By default set to 15,000 (15 seconds).
 	 */
 	public void setReceiptTimeLimit(long receiptTimeLimit) {
-		Assert.isTrue(receiptTimeLimit > 0);
+		Assert.isTrue(receiptTimeLimit > 0, "Receipt time limit must be larger than zero");
 		this.receiptTimeLimit = receiptTimeLimit;
 	}
 

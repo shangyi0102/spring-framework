@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-2017 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,11 +26,14 @@ import java.util.concurrent.atomic.AtomicReference;
 import com.fasterxml.jackson.core.JsonEncoding;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.PrettyPrinter;
+import com.fasterxml.jackson.core.util.DefaultIndenter;
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.databind.SerializationConfig;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.ser.FilterProvider;
 import com.fasterxml.jackson.databind.type.TypeFactory;
@@ -63,27 +66,36 @@ public abstract class AbstractJackson2HttpMessageConverter extends AbstractGener
 
 	public static final Charset DEFAULT_CHARSET = Charset.forName("UTF-8");
 
+	private static final MediaType TEXT_EVENT_STREAM = new MediaType("text", "event-stream");
+
 
 	protected ObjectMapper objectMapper;
 
 	private Boolean prettyPrint;
 
+	private PrettyPrinter ssePrettyPrinter;
+
 
 	protected AbstractJackson2HttpMessageConverter(ObjectMapper objectMapper) {
-		this.objectMapper = objectMapper;
-		setDefaultCharset(DEFAULT_CHARSET);
+		init(objectMapper);
 	}
 
 	protected AbstractJackson2HttpMessageConverter(ObjectMapper objectMapper, MediaType supportedMediaType) {
 		super(supportedMediaType);
-		this.objectMapper = objectMapper;
-		setDefaultCharset(DEFAULT_CHARSET);
+		init(objectMapper);
 	}
 
 	protected AbstractJackson2HttpMessageConverter(ObjectMapper objectMapper, MediaType... supportedMediaTypes) {
 		super(supportedMediaTypes);
+		init(objectMapper);
+	}
+
+	protected void init(ObjectMapper objectMapper) {
 		this.objectMapper = objectMapper;
 		setDefaultCharset(DEFAULT_CHARSET);
+		DefaultPrettyPrinter prettyPrinter = new DefaultPrettyPrinter();
+		prettyPrinter.indentObjectsWith(new DefaultIndenter("  ", "\ndata:"));
+		this.ssePrettyPrinter = prettyPrinter;
 	}
 
 
@@ -192,12 +204,6 @@ public abstract class AbstractJackson2HttpMessageConverter extends AbstractGener
 	}
 
 	@Override
-	protected boolean supports(Class<?> clazz) {
-		// should not be called, since we override canRead/Write instead
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
 	protected Object readInternal(Class<?> clazz, HttpInputMessage inputMessage)
 			throws IOException, HttpMessageNotReadableException {
 
@@ -224,8 +230,11 @@ public abstract class AbstractJackson2HttpMessageConverter extends AbstractGener
 			}
 			return this.objectMapper.readValue(inputMessage.getBody(), javaType);
 		}
+		catch (JsonProcessingException ex) {
+			throw new HttpMessageNotReadableException("JSON parse error: " + ex.getOriginalMessage(), ex);
+		}
 		catch (IOException ex) {
-			throw new HttpMessageNotReadableException("Could not read document: " + ex.getMessage(), ex);
+			throw new HttpMessageNotReadableException("I/O error while reading input message", ex);
 		}
 	}
 
@@ -233,7 +242,8 @@ public abstract class AbstractJackson2HttpMessageConverter extends AbstractGener
 	protected void writeInternal(Object object, Type type, HttpOutputMessage outputMessage)
 			throws IOException, HttpMessageNotWritableException {
 
-		JsonEncoding encoding = getJsonEncoding(outputMessage.getHeaders().getContentType());
+		MediaType contentType = outputMessage.getHeaders().getContentType();
+		JsonEncoding encoding = getJsonEncoding(contentType);
 		JsonGenerator generator = this.objectMapper.getFactory().createGenerator(outputMessage.getBody(), encoding);
 		try {
 			writePrefix(generator, object);
@@ -264,6 +274,11 @@ public abstract class AbstractJackson2HttpMessageConverter extends AbstractGener
 			if (javaType != null && javaType.isContainerType()) {
 				objectWriter = objectWriter.forType(javaType);
 			}
+			SerializationConfig config = objectWriter.getConfig();
+			if (contentType != null && contentType.isCompatibleWith(TEXT_EVENT_STREAM) &&
+					config.isEnabled(SerializationFeature.INDENT_OUTPUT)) {
+				objectWriter = objectWriter.with(this.ssePrettyPrinter);
+			}
 			objectWriter.writeValue(generator, value);
 
 			writeSuffix(generator, object);
@@ -271,7 +286,7 @@ public abstract class AbstractJackson2HttpMessageConverter extends AbstractGener
 
 		}
 		catch (JsonProcessingException ex) {
-			throw new HttpMessageNotWritableException("Could not write content: " + ex.getMessage(), ex);
+			throw new HttpMessageNotWritableException("Could not write JSON: " + ex.getOriginalMessage(), ex);
 		}
 	}
 

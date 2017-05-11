@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-2017 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -99,7 +99,7 @@ public class MappingJackson2HttpMessageConverterTests {
 		assertEquals("Foo", result.get("string"));
 		assertEquals(42, result.get("number"));
 		assertEquals(42D, (Double) result.get("fraction"), 0D);
-		List<String> array = new ArrayList<String>();
+		List<String> array = new ArrayList<>();
 		array.add("Foo");
 		array.add("Bar");
 		assertEquals(array, result.get("array"));
@@ -162,7 +162,6 @@ public class MappingJackson2HttpMessageConverterTests {
 	@SuppressWarnings("unchecked")
 	public void readGenerics() throws IOException {
 		MappingJackson2HttpMessageConverter converter = new MappingJackson2HttpMessageConverter() {
-
 			@Override
 			protected JavaType getJavaType(Type type, Class<?> contextClass) {
 				if (type instanceof Class && List.class.isAssignableFrom((Class<?>)type)) {
@@ -223,6 +222,20 @@ public class MappingJackson2HttpMessageConverterTests {
 		String result = outputMessage.getBodyAsString(Charset.forName("UTF-8"));
 
 		assertEquals("{" + NEWLINE_SYSTEM_PROPERTY + "  \"name\" : \"Jason\"" + NEWLINE_SYSTEM_PROPERTY + "}", result);
+	}
+
+	@Test
+	public void prettyPrintWithSse() throws Exception {
+		MockHttpOutputMessage outputMessage = new MockHttpOutputMessage();
+		outputMessage.getHeaders().setContentType(new MediaType("text", "event-stream"));
+		PrettyPrintBean bean = new PrettyPrintBean();
+		bean.setName("Jason");
+
+		this.converter.setPrettyPrint(true);
+		this.converter.writeInternal(bean, null, outputMessage);
+		String result = outputMessage.getBodyAsString(Charset.forName("UTF-8"));
+
+		assertEquals("{\ndata:  \"name\" : \"Jason\"\ndata:}", result);
 	}
 
 	@Test
@@ -437,9 +450,9 @@ public class MappingJackson2HttpMessageConverterTests {
 	}
 
 
-	private interface MyJacksonView1 {};
+	private interface MyJacksonView1 {}
 
-	private interface MyJacksonView2 {};
+	private interface MyJacksonView2 {}
 
 
 	@SuppressWarnings("unused")

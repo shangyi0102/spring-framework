@@ -4,6 +4,7 @@
 
 [[beans-introduction]]
 == Introduction to the Spring IoC container and beans
+
 This chapter covers the Spring Framework implementation of the Inversion of Control
 (IoC) footnote:[See pass:specialcharacters,macros[<<background-ioc>>] ] principle. IoC
 is also known as __dependency injection__ (DI). It is a process whereby objects define
@@ -44,6 +45,7 @@ among them, are reflected in the __configuration metadata__ used by a container.
 
 [[beans-basics]]
 == Container overview
+
 The interface `org.springframework.context.ApplicationContext` represents the Spring IoC
 container and is responsible for instantiating, configuring, and assembling the
 aforementioned beans. The container gets its instructions on what objects to
@@ -290,6 +292,44 @@ locations, for example, through "${...}" placeholders that are resolved against 
 system properties at runtime.
 ====
 
+The import directive is a feature provided by the beans namespace itself. Further
+configuration features beyond plain bean definitions are available in a selection
+of XML namespaces provided by Spring, e.g. the "context" and the "util" namespace.
+
+
+[[groovy-bean-definition-dsl]]
+==== The Groovy Bean Definition DSL
+
+As a further example for externalized configuration metadata, bean definitions can also
+be expressed in Spring's Groovy Bean Definition DSL, as known from the Grails framework.
+Typically, such configuration will live in a ".groovy" file with a structure as follows:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+    beans {
+        dataSource(BasicDataSource) {
+            driverClassName = "org.hsqldb.jdbcDriver"
+            url = "jdbc:hsqldb:mem:grailsDB"
+            username = "sa"
+            password = ""
+            settings = [mynew:"setting"]
+        }
+        sessionFactory(SessionFactory) {
+            dataSource = dataSource
+        }
+        myService(MyService) {
+            nestedBean = { AnotherBean bean ->
+                dataSource = dataSource
+            }
+        }
+    }
+----
+
+This configuration style is largely equivalent to XML bean definitions and even
+supports Spring's XML configuration namespaces. It also allows for importing XML
+bean definition files through an "importBeans" directive.
+
 
 
 [[beans-factory-client]]
@@ -305,8 +345,7 @@ The `ApplicationContext` enables you to read bean definitions and access them as
 [subs="verbatim,quotes"]
 ----
 	// create and configure beans
-	ApplicationContext context =
-		new ClassPathXmlApplicationContext(new String[] {"services.xml", "daos.xml"});
+	ApplicationContext context = new ClassPathXmlApplicationContext("services.xml", "daos.xml");
 
 	// retrieve configured instance
 	PetStoreService service = context.getBean("petStore", PetStoreService.class);
@@ -315,12 +354,46 @@ The `ApplicationContext` enables you to read bean definitions and access them as
 	List<String> userList = service.getUsernameList();
 ----
 
-You use `getBean()` to retrieve instances of your beans. The `ApplicationContext`
+With Groovy configuration, bootstrapping looks very similar, just a different context
+implementation class which is Groovy-aware (but also understands XML bean definitions):
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	ApplicationContext context = new GenericGroovyApplicationContext("services.groovy", "daos.groovy");
+----
+
+The most flexible variant is `GenericApplicationContext` in combination with reader
+delegates, e.g. with `XmlBeanDefinitionReader` for XML files:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	GenericApplicationContext context = new GenericApplicationContext();
+	new XmlBeanDefinitionReader(context).loadBeanDefinitions("services.xml", "daos.xml");
+    context.refresh();
+----
+
+Or with `GroovyBeanDefinitionReader` for Groovy files:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	GenericApplicationContext context = new GenericApplicationContext();
+	new GroovyBeanDefinitionReader(context).loadBeanDefinitions("services.groovy", "daos.groovy");
+    context.refresh();
+----
+
+Such reader delegates can be mixed and matched on the same `ApplicationContext`,
+reading bean definitions from diverse configuration sources, if desired.
+
+You can then use `getBean` to retrieve instances of your beans. The `ApplicationContext`
 interface has a few other methods for retrieving beans, but ideally your application
 code should never use them. Indeed, your application code should have no calls to the
 `getBean()` method at all, and thus no dependency on Spring APIs at all. For example,
-Spring's integration with web frameworks provides for dependency injection for various
-web framework classes such as controllers and JSF-managed beans.
+Spring's integration with web frameworks provides dependency injection for various web
+framework components such as controllers and JSF-managed beans, allowing you to declare
+a dependency on a specific bean through metadata (e.g. an autowiring annotation).
 
 
 
@@ -496,6 +569,8 @@ creating a namespace), yet they refer to the same bean.
 If you are using Java-configuration, the `@Bean` annotation can be used to provide aliases
 see <<beans-java-bean-annotation>> for details.
 ****
+
+
 
 [[beans-factory-class]]
 === Instantiating beans
@@ -1286,7 +1361,7 @@ element.
 
 	<bean id="theClientBean" class="...">
 		<property name="targetName">
-			<idref bean="theTargetBean" />
+			<idref bean="theTargetBean"/>
 		</property>
 	</bean>
 ----
@@ -1300,7 +1375,7 @@ following snippet:
 	<bean id="theTargetBean" class="..." />
 
 	<bean id="client" class="...">
-		<property name="targetName" value="theTargetBean" />
+		<property name="targetName" value="theTargetBean"/>
 	</bean>
 ----
 
@@ -2001,6 +2076,14 @@ the `autowire-candidate` attribute of the `<bean/>` element to `false`; the cont
 makes that specific bean definition unavailable to the autowiring infrastructure
 (including annotation style configurations such as <<beans-autowired-annotation,
 `@Autowired`>>).
+
+[NOTE]
+====
+The `autowire-candidate` attribute is designed to only affect type-based autowiring.
+It does not affect explicit references by name, which will get resolved even if the
+specified bean is not marked as an autowire candidate. As a consequence, autowiring
+by name will nevertheless inject a bean if the name matches.
+====
 
 You can also limit autowire candidates based on pattern-matching against bean names. The
 top-level `<beans/>` element accepts one or more patterns within its
@@ -5329,7 +5412,7 @@ comma/semicolon/space-separated list that includes the parent package of each cl
 [NOTE]
 ====
 for concision, the above may have used the `value` attribute of the
-annotation, i.e. `ComponentScan("org.example")`
+annotation, i.e. `@ComponentScan("org.example")`
 ====
 
 The following is an alternative using XML
@@ -5881,6 +5964,11 @@ other beans through a `Provider.get()` call. As a variant of the example above:
 	public class SimpleMovieLister {
 
 		private Provider<MovieFinder> movieFinder;
+
+		@Inject
+		public void setMovieFinder(Provider<MovieFinder> movieFinder) {
+			this.movieFinder = movieFinder;
+		}
 
 		public void listMovies() {
 			this.movieFinder.get().findMovies(...);
@@ -7123,6 +7211,7 @@ method that returns `true` or `false`. For example, here is the actual
 See the {api-spring-framework}/context/annotation/Conditional.html[
 `@Conditional` javadocs] for more detail.
 
+
 [[beans-java-combining]]
 ==== Combining Java and XML configuration
 
@@ -7313,6 +7402,9 @@ jdbc.password=
 	}
 ----
 
+
+
+
 [[beans-environment]]
 == Environment abstraction
 
@@ -7333,6 +7425,8 @@ variables, JNDI, servlet context parameters, ad-hoc Properties objects, Maps, an
 on. The role of the `Environment` object with relation to properties is to provide the
 user with a convenient service interface for configuring property sources and resolving
 properties from them.
+
+
 
 [[beans-definition-profiles]]
 === Bean definition profiles
@@ -7395,6 +7489,7 @@ certain profile of bean definitions in situation A, and a different profile in
 situation B. Let's first see how we can update our configuration to reflect
 this need.
 
+
 [[beans-definition-profiles-java]]
 ==== @Profile
 
@@ -7407,7 +7502,7 @@ can rewrite the `dataSource` configuration as follows:
 [subs="verbatim,quotes"]
 ----
 	@Configuration
-	**@Profile("dev")**
+	**@Profile("development")**
 	public class StandaloneDataConfig {
 
 		@Bean
@@ -7459,34 +7554,6 @@ of creating a custom _composed annotation_. The following example defines a cust
 	}
 ----
 
-`@Profile` can also be declared at the method level to include only one particular bean
-of a configuration class:
-
-[source,java,indent=0]
-[subs="verbatim,quotes"]
-----
-	@Configuration
-	public class AppConfig {
-
-		@Bean
-		**@Profile("dev")**
-		public DataSource devDataSource() {
-			return new EmbeddedDatabaseBuilder()
-				.setType(EmbeddedDatabaseType.HSQL)
-				.addScript("classpath:com/bank/config/sql/schema.sql")
-				.addScript("classpath:com/bank/config/sql/test-data.sql")
-				.build();
-		}
-
-		@Bean
-		**@Profile("production")**
-		public DataSource productionDataSource() throws Exception {
-			Context ctx = new InitialContext();
-			return (DataSource) ctx.lookup("java:comp/env/jdbc/datasource");
-		}
-	}
-----
-
 [TIP]
 ====
 If a `@Configuration` class is marked with `@Profile`, all of the `@Bean` methods and
@@ -7499,8 +7566,56 @@ active. For example, given `@Profile({"p1", "!p2"})`, registration will occur if
 'p1' is active or if profile 'p2' is not active.
 ====
 
+`@Profile` can also be declared at the method level to include only one particular bean
+of a configuration class, e.g. for alternative variants of a particular bean:
+
+[source,java,indent=0]
+[subs="verbatim,quotes"]
+----
+	@Configuration
+	public class AppConfig {
+
+		@Bean("dataSource")
+		**@Profile("development")**
+		public DataSource standaloneDataSource() {
+			return new EmbeddedDatabaseBuilder()
+				.setType(EmbeddedDatabaseType.HSQL)
+				.addScript("classpath:com/bank/config/sql/schema.sql")
+				.addScript("classpath:com/bank/config/sql/test-data.sql")
+				.build();
+		}
+
+		@Bean("dataSource")
+		**@Profile("production")**
+		public DataSource jndiDataSource() throws Exception {
+			Context ctx = new InitialContext();
+			return (DataSource) ctx.lookup("java:comp/env/jdbc/datasource");
+		}
+	}
+----
+
+[NOTE]
+====
+With `@Profile` on `@Bean` methods, a special scenario may apply: In the case of
+overloaded `@Bean` methods of the same Java method name (analogous to constructor
+overloading), an `@Profile` condition needs to be consistently declared on all
+overloaded methods. If the conditions are inconsistent, only the condition on the
+first declaration among the overloaded methods will matter. `@Profile` can therefore
+not be used to select an overloaded method with a particular argument signature over
+another; resolution between all factory methods for the same bean follows Spring's
+constructor resolution algorithm at creation time.
+
+If you would like to define alternative beans with different profile conditions,
+use distinct Java method names pointing to the same bean name via the `@Bean` name
+attribute, as indicated in the example above. If the argument signatures are all
+the same (e.g. all of the variants have no-arg factory methods), this is the only
+way to represent such an arrangement in a valid Java class in the first place
+(since there can only be one method of a particular name and argument signature).
+====
+
+
 [[beans-definition-profiles-xml]]
-=== XML bean definition profiles
+==== XML bean definition profiles
 
 The XML counterpart is the `profile` attribute of the `<beans>` element. Our sample
 configuration above can be rewritten in two XML files as follows:
@@ -7508,7 +7623,7 @@ configuration above can be rewritten in two XML files as follows:
 [source,xml,indent=0]
 [subs="verbatim,quotes"]
 ----
-	<beans profile="dev"
+	<beans profile="development"
 		xmlns="http://www.springframework.org/schema/beans"
 		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 		xmlns:jdbc="http://www.springframework.org/schema/jdbc"
@@ -7547,7 +7662,7 @@ It is also possible to avoid that split and nest `<beans/>` elements within the 
 
 		<!-- other bean definitions -->
 
-		<beans profile="dev">
+		<beans profile="development">
 			<jdbc:embedded-database id="dataSource">
 				<jdbc:script location="classpath:com/bank/config/sql/schema.sql"/>
 				<jdbc:script location="classpath:com/bank/config/sql/test-data.sql"/>
@@ -7563,6 +7678,7 @@ It is also possible to avoid that split and nest `<beans/>` elements within the 
 The `spring-bean.xsd` has been constrained to allow such elements only as the
 last ones in the file. This should help provide flexibility without incurring
 clutter in the XML files.
+
 
 [[beans-definition-profiles-enable]]
 ==== Activating a profile
@@ -7580,7 +7696,7 @@ it programmatically against the `Environment` API which is available via an
 [subs="verbatim,quotes"]
 ----
 	AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext();
-	ctx.getEnvironment().setActiveProfiles("dev");
+	ctx.getEnvironment().setActiveProfiles("development");
 	ctx.register(SomeConfig.class, StandaloneDataConfig.class, JndiDataConfig.class);
 	ctx.refresh();
 ----
@@ -7609,6 +7725,7 @@ Declaratively, `spring.profiles.active` may accept a comma-separated list of pro
 ----
 	-Dspring.profiles.active="profile1,profile2"
 ----
+
 
 [[beans-definition-profiles-default]]
 ==== Default profile
@@ -7639,6 +7756,8 @@ profile is enabled, the _default_ profile will not apply.
 
 The name of the default profile can be changed using `setDefaultProfiles()` on
 the `Environment` or declaratively using the `spring.profiles.default` property.
+
+
 
 [[beans-property-source-abstraction]]
 === PropertySource abstraction
@@ -7717,6 +7836,8 @@ any `foo` property in any other `PropertySource`. The
 API exposes a number of methods that allow for precise manipulation of the set of
 property sources.
 
+
+
 === @PropertySource
 
 The {api-spring-framework}/context/annotation/PropertySource.html[`@PropertySource`]
@@ -7774,6 +7895,7 @@ as a default. If no default is specified and a property cannot be resolved, an
 `IllegalArgumentException` will be thrown.
 
 
+
 === Placeholder resolution in statements
 
 Historically, the value of placeholders in elements could be resolved only against
@@ -7794,6 +7916,8 @@ property is defined, as long as it is available in the `Environment`:
 		<import resource="com/bank/service/${customer}-config.xml"/>
 	</beans>
 ----
+
+
 
 
 [[context-load-time-weaver]]
@@ -8220,7 +8344,7 @@ synchronously. This means the `publishEvent()` method blocks until all listeners
 finished processing the event. One advantage of this synchronous and single-threaded
 approach is that when a listener receives an event, it operates inside the transaction
 context of the publisher if a transaction context is available. If another strategy for
-event publication becomes necessary, refer to the JavaDoc for Spring's
+event publication becomes necessary, refer to the javadoc for Spring's
 `ApplicationEventMulticaster` interface.
 
 The following example shows the bean definitions used to register and configure each of
@@ -8287,9 +8411,10 @@ follows:
 	}
 ----
 
-As you can see above, the method signature actually _infer_ which even type it listens to. This
-also works for nested generics as long as the actual event resolves the generics parameter you
-would filter on.
+As you can see above, the method signature once again declares the event type it listens to,
+but this time with a flexible name and without implementing a specific listener interface.
+The event type can also be narrowed through generics as long as the actual event type
+resolves your generic parameter in its implementation hierarchy.
 
 If your method should listen to several events or if you want to define it with no
 parameter at all, the event type(s) can also be specified on the annotation itself:
@@ -8299,7 +8424,7 @@ parameter at all, the event type(s) can also be specified on the annotation itse
 ----
 	@EventListener({ContextStartedEvent.class, ContextRefreshedEvent.class})
 	public void handleContextStart() {
-
+		...
 	}
 ----
 
@@ -8549,7 +8674,7 @@ platform's JMX server - all through Spring's standard transaction management and
 and JMX support facilities. Application components can also interact with the
 application server's JCA WorkManager through Spring's `TaskExecutor` abstraction.
 
-Check out the JavaDoc of the
+Check out the javadoc of the
 {api-spring-framework}/jca/context/SpringContextResourceAdapter.html[`SpringContextResourceAdapter`]
 class for the configuration details involved in RAR deployment.
 
@@ -8557,7 +8682,7 @@ __For a simple deployment of a Spring ApplicationContext as a Java EE RAR file:_
 all application classes into a RAR file, which is a standard JAR file with a different
 file extension. Add all required library JARs into the root of the RAR archive. Add a
 "META-INF/ra.xml" deployment descriptor (as shown in ``SpringContextResourceAdapter``s
-JavaDoc) and the corresponding Spring XML bean definition file(s) (typically
+javadoc) and the corresponding Spring XML bean definition file(s) (typically
 "META-INF/applicationContext.xml"), and drop the resulting RAR file into your
 application server's deployment directory.
 

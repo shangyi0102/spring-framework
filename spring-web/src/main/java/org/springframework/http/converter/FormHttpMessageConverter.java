@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-2017 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -179,12 +179,11 @@ public class FormHttpMessageConverter implements HttpMessageConverter<MultiValue
 	 * names. Encoding is based on the encoded-word syntax defined in RFC 2047
 	 * and relies on {@code MimeUtility} from "javax.mail".
 	 * <p>If not set file names will be encoded as US-ASCII.
-	 * @param multipartCharset the charset to use
 	 * @since 4.1.1
 	 * @see <a href="http://en.wikipedia.org/wiki/MIME#Encoded-Word">Encoded-Word</a>
 	 */
-	public void setMultipartCharset(Charset multipartCharset) {
-		this.multipartCharset = multipartCharset;
+	public void setMultipartCharset(Charset charset) {
+		this.multipartCharset = charset;
 	}
 
 
@@ -395,12 +394,7 @@ public class FormHttpMessageConverter implements HttpMessageConverter<MultiValue
 	 * or a newly built {@link HttpEntity} wrapper for that part
 	 */
 	protected HttpEntity<?> getHttpEntity(Object part) {
-		if (part instanceof HttpEntity) {
-			return (HttpEntity<?>) part;
-		}
-		else {
-			return new HttpEntity<Object>(part);
-		}
+		return (part instanceof HttpEntity ? (HttpEntity<?>) part : new HttpEntity<Object>(part));
 	}
 
 	/**
@@ -415,7 +409,7 @@ public class FormHttpMessageConverter implements HttpMessageConverter<MultiValue
 		if (part instanceof Resource) {
 			Resource resource = (Resource) part;
 			String filename = resource.getFilename();
-			if (this.multipartCharset != null) {
+			if (filename != null && this.multipartCharset != null) {
 				filename = MimeDelegate.encode(filename, this.multipartCharset.name());
 			}
 			return filename;

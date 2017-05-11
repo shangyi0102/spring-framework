@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-2017 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,6 +52,7 @@ import org.springframework.web.method.support.ModelAndViewContainer;
  * @author Rossen Stoyanchev
  * @since 4.2
  */
+@SuppressWarnings("deprecation")
 public class ResponseBodyEmitterReturnValueHandler implements AsyncHandlerMethodReturnValueHandler {
 
 	private static final Log logger = LogFactory.getLog(ResponseBodyEmitterReturnValueHandler.class);
@@ -63,9 +64,9 @@ public class ResponseBodyEmitterReturnValueHandler implements AsyncHandlerMethod
 
 
 	public ResponseBodyEmitterReturnValueHandler(List<HttpMessageConverter<?>> messageConverters) {
-		Assert.notEmpty(messageConverters, "'messageConverters' must not be empty");
+		Assert.notEmpty(messageConverters, "HttpMessageConverter List must not be empty");
 		this.messageConverters = messageConverters;
-		this.adapterMap = new HashMap<Class<?>, ResponseBodyEmitterAdapter>(3);
+		this.adapterMap = new HashMap<Class<?>, ResponseBodyEmitterAdapter>(4);
 		this.adapterMap.put(ResponseBodyEmitter.class, new SimpleResponseBodyEmitterAdapter());
 	}
 
@@ -75,7 +76,9 @@ public class ResponseBodyEmitterReturnValueHandler implements AsyncHandlerMethod
 	 * By default the map contains a single adapter {@code ResponseBodyEmitter}
 	 * that simply downcasts the return value.
 	 * @return the map of adapters
+	 * @deprecated in 4.3.8, see comments on {@link ResponseBodyEmitterAdapter}
 	 */
+	@Deprecated
 	public Map<Class<?>, ResponseBodyEmitterAdapter> getAdapterMap() {
 		return this.adapterMap;
 	}
@@ -146,7 +149,10 @@ public class ResponseBodyEmitterReturnValueHandler implements AsyncHandlerMethod
 		ShallowEtagHeaderFilter.disableContentCaching(request);
 
 		ResponseBodyEmitterAdapter adapter = getAdapterFor(returnValue.getClass());
-		Assert.notNull(adapter);
+		if (adapter == null) {
+			throw new IllegalStateException(
+					"Could not find ResponseBodyEmitterAdapter for return value type: " + returnValue.getClass());
+		}
 		ResponseBodyEmitter emitter = adapter.adaptToEmitter(returnValue, outputMessage);
 		emitter.extendResponse(outputMessage);
 
@@ -170,7 +176,7 @@ public class ResponseBodyEmitterReturnValueHandler implements AsyncHandlerMethod
 
 		@Override
 		public ResponseBodyEmitter adaptToEmitter(Object returnValue, ServerHttpResponse response) {
-			Assert.isInstanceOf(ResponseBodyEmitter.class, returnValue);
+			Assert.isInstanceOf(ResponseBodyEmitter.class, returnValue, "ResponseBodyEmitter expected");
 			return (ResponseBodyEmitter) returnValue;
 		}
 	}
